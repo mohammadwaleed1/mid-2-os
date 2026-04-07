@@ -1,0 +1,74 @@
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+// --- 1. MODE: OFF (Disabled) ---
+// This thread will ignore the cancel request and finish its loop.
+void* worker_off(void* arg) {
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+    
+    for(int i = 1; i <= 3; i++) {
+        printf("Mode OFF: I am immune! Working... (%d/3)\n", i);
+        sleep(1);
+    }
+    printf("Mode OFF: Finished naturally despite cancel request.\n");
+    return NULL;
+}
+
+// --- 2. MODE: DEFERRED (Enabled + Deferred) ---
+// This is the SAFE default. It waits for a checkpoint (sleep).
+void* worker_deferred(void* arg) {
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+
+    while(1) {
+        printf("Mode DEFERRED: Working safely...\n");
+        sleep(1); // <--- CANCELLATION POINT: It stops here.
+    }
+    return NULL;
+}
+
+// --- 3. MODE: ASYNCHRONOUS (Enabled + Asynchronous) ---
+// This is the DANGEROUS mode. It dies instantly mid-calculation.
+void* worker_async(void* arg) {
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+    printf("Mode ASYNC: I'm doing a heavy calculation...\n");
+    while(1) {
+        // Just spinning in a loop. No sleep, no prints.
+        // It will die the microsecond main calls cancel.
+    }
+    return NULL;
+}
+
+int main() {
+    pthread_t t1, t2, t3;
+
+    // Test 1: OFF
+    pthread_create(&t1, NULL, worker_off, NULL);
+    sleep(1);
+    pthread_cancel(t1); // This will be ignored
+    pthread_join(t1, NULL);
+    printf("----------------------------\n");
+
+    // Test 2: DEFERRED
+    pthread_create(&t2, NULL, worker_deferred, NULL);
+    sleep(2);
+    printf("Main: Cancelling Deferred Thread...\n");
+    pthread_cancel(t2); 
+    pthread_join(t2, NULL);
+    printf("Main: Deferred Thread stopped at a safe checkpoint.\n");
+    printf("----------------------------\n");
+
+    // Test 3: ASYNCHRONOUS
+    pthread_create(&t3, NULL, worker_async, NULL);
+    sleep(2);
+    printf("Main: Killing Async Thread INSTANTLY...\n");
+    pthread_cancel(t3); 
+    pthread_join(t3, NULL);
+    printf("Main: Async Thread is gone.\n");
+
+    return 0;
+}

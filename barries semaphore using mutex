@@ -1,0 +1,57 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+
+#define NUM_THREADS 3
+
+sem_t gate;
+pthread_mutex_t counter_lock;
+int arrival_count = 0;
+
+void* thread_func(void* arg) {
+    long id = (long)arg;
+
+    printf("Thread %ld: Working on Phase 1...\n", id);
+    
+    // --- THE BARRIER START ---
+    pthread_mutex_lock(&counter_lock);
+    arrival_count++;
+    
+    if (arrival_count < NUM_THREADS) {
+        // Not the last thread, so we wait at the gate
+        printf("Thread %ld: Reached barrier, waiting for others...\n", id);
+        pthread_mutex_unlock(&counter_lock);
+        sem_wait(&gate); // Sleep here until the last thread arrives
+    } else {
+        // I am the LAST thread!
+        printf("Thread %ld: Last one here! Opening the gate...\n", id);
+        
+        // Wake up the other N-1 threads
+        for (int i = 0; i < NUM_THREADS - 1; i++) {
+            sem_post(&gate);
+        }
+        pthread_mutex_unlock(&counter_lock);
+    }
+    // --- THE BARRIER END ---
+
+    printf("Thread %ld: Passed barrier! Starting Phase 2...\n", id);
+    return NULL;
+}
+
+int main() {
+    pthread_t threads[NUM_THREADS];
+    sem_init(&gate, 0, 0); // Start gate at 0 (locked)
+    pthread_mutex_init(&counter_lock, NULL);
+
+    for (long i = 0; i < NUM_THREADS; i++) {
+        pthread_create(&threads[i], NULL, thread_func, (void*)i);
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    sem_destroy(&gate);
+    pthread_mutex_destroy(&counter_lock);
+    return 0;
+}

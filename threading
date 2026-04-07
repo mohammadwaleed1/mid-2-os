@@ -1,0 +1,56 @@
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+// Function prototypes
+void* func_thread_7(void* arg) { printf("Thread 7 is running (Child of 5)\n"); return NULL; }
+void* func_thread_6(void* arg) { printf("Thread 6 is running (Child of 4)\n"); return NULL; }
+void* func_thread_3(void* arg) { printf("Thread 3 is running (Child of 2)\n"); return NULL; }
+
+// Thread 5 creates Thread 7
+void* func_thread_5(void* arg) {
+    pthread_t t7;
+    printf("Thread 5 is running (Child of 2) -> Spawning 7\n");
+    pthread_create(&t7, NULL, func_thread_7, NULL);
+    pthread_join(t7, NULL); 
+    return NULL;
+}
+
+// Thread 4 creates Thread 6
+void* func_thread_4(void* arg) {
+    pthread_t t6;
+    printf("Thread 4 is running (Child of 2) -> Spawning 6\n");
+    pthread_create(&t6, NULL, func_thread_6, NULL);
+    pthread_join(t6, NULL);
+    return NULL;
+}
+
+// Thread 2 creates Threads 3, 4, and 5
+void* func_thread_2(void* arg) {
+    pthread_t t3, t4, t5;
+    printf("Thread 2 is running (Child of 1) -> Spawning 3, 4, 5\n");
+    
+    pthread_create(&t3, NULL, func_thread_3, NULL);
+    pthread_create(&t4, NULL, func_thread_4, NULL);
+    pthread_create(&t5, NULL, func_thread_5, NULL);
+
+    pthread_join(t3, NULL);
+    pthread_join(t4, NULL);
+    pthread_join(t5, NULL);
+    return NULL;
+}
+
+// Thread 1 (Main)
+int main() {
+    pthread_t t2;
+    printf("Thread 1 (Main) starting -> Spawning 2\n");
+    
+    pthread_create(&t2, NULL, func_thread_2, NULL);
+    
+    // Main waits for the entire tree to finish
+    pthread_join(t2, NULL);
+    
+    printf("All threads finished. Thread 1 exiting.\n");
+    return 0;
+}

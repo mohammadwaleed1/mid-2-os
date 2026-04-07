@@ -1,0 +1,50 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+
+// 1. Define Global Variables
+static volatile int counter = 0;
+sem_t mutex_sem; // Our semaphore acting as a mutex
+
+void *mythread(void *arg) {
+    printf("%s: begin\n", (char *) arg);
+    
+    for (int i = 0; i < 1e7; i++) {
+        // 2. Wait (P operation): Decrement semaphore. 
+        // If it's 1, it becomes 0 and we proceed. 
+        // If it's 0, we wait.
+        sem_wait(&mutex_sem);
+        
+        counter = counter + 1; // Critical Section
+        
+        // 3. Post (V operation): Increment semaphore.
+        // This signals to the other thread that the room is free.
+        sem_post(&mutex_sem);
+    }
+    
+    printf("%s: done\n", (char *) arg);
+    return NULL;
+}
+
+int main() {
+    pthread_t p1, p2;
+    
+    // 4. Initialize semaphore: 
+    // Arguments: (&sem, pshared=0, initial_value=1)
+    sem_init(&mutex_sem, 0, 1);
+
+    printf("main: begin (counter = %d)\n", counter);
+    
+    pthread_create(&p1, NULL, mythread, "A");
+    pthread_create(&p2, NULL, mythread, "B");
+
+    pthread_join(p1, NULL);
+    pthread_join(p2, NULL);
+
+    printf("main: done with both (counter = %d)\n", counter);
+    
+    // 5. Clean up
+    sem_destroy(&mutex_sem);
+    
+    return 0;
+}

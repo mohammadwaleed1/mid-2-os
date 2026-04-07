@@ -1,0 +1,54 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <time.h>
+#include <errno.h>
+
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+void* thread_func(void* arg) {
+    char *name = (char *)arg;
+    struct timespec ts;
+
+    // 1. Get current time and add 2 seconds for the timeout deadline
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 2; 
+
+    printf("Thread %s: Trying to acquire lock with 2-second timeout...\n", name);
+
+    // 2. Attempt to lock with a timeout
+    int result = pthread_mutex_timedlock(&lock, &ts);
+
+    if (result == 0) {
+        printf("Thread %s: SUCCESS! Entered critical section.\n", name);
+        sleep(1); // Simulate work
+        pthread_mutex_unlock(&lock);
+        printf("Thread %s: Released lock.\n", name);
+    } else if (result == ETIMEDOUT) {
+        printf("Thread %s: TIMEOUT! Could not get lock within 2 seconds. Moving on...\n", name);
+    } else {
+        printf("Thread %s: Error occurred.\n", name);
+    }
+
+    return NULL;
+}
+
+int main() {
+    pthread_t p1, p2;
+
+    // Force Thread 1 to grab the lock first and hold it for 5 seconds
+    pthread_mutex_lock(&lock);
+    printf("Main: I am holding the lock for 5 seconds to force a timeout...\n");
+
+    pthread_create(&p1, NULL, thread_func, "A");
+    
+    // Wait 5 seconds before Main releases the lock
+    sleep(5);
+    printf("Main: Finally releasing the lock.\n");
+    pthread_mutex_unlock(&lock);
+
+    pthread_join(p1, NULL);
+
+    pthread_mutex_destroy(&lock);
+    return 0;
+}

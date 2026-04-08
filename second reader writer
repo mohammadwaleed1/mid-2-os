@@ -1,0 +1,80 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h> // Added for sleep to make output readable
+
+//priority to writer muktple can come reader need to wait
+// Global synchronization variables
+
+sem_t rw_mutex, mutex,mutex 2;
+int writer_count = 0;
+
+// Writer thread function
+void* reader(void* arg) {
+    while (1) {
+        sem_wait(&rw_mutex); // Lock access for writing
+        
+        printf("reader is reading\n");
+        sleep(1); // Simulate writing time
+        
+        sem_post(&rw_mutex); // Release access
+        sleep(2); // Wait before trying to write again
+    }
+    return NULL;
+}
+
+// Reader thread function
+void* writer(void* arg) {
+    long id = (long)arg; // Identify which reader this is
+    
+    while (1) {
+        // --- Entry Section ---
+        sem_wait(&mutex);        // Protect read_count
+        writer_count++;
+        if (writer_count == 1) {   // If first reader, lock the writer out
+            sem_wait(&rw_mutex);
+        }
+        sem_post(&mutex);        // Release read_count lock
+        sem_wait(&mutex2)
+        // --- Reading Section ---
+        printf("writer %ld is writing\n", id);
+        sem_post(&mutex2);
+        sleep(1); // Simulate reading time
+        
+        // --- Exit Section ---
+        sem_wait(&mutex);        // Protect read_count
+        writer_count--;
+        if (writer_count == 0) {   // If last reader, let writers in
+            sem_post(&rw_mutex);
+        }
+        sem_post(&mutex);        // Release read_count lock
+        
+        sleep(1); // Wait before trying to read again
+    }
+    return NULL;
+}
+
+int main() {
+    pthread_t w, r1, r2;
+
+    // Initialize semaphores
+    // sem_init(address, pshared, initial_value)
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&mutex, 0, 1);
+
+    // Create threads
+    pthread_create(&w, NULL, writer, NULL);
+    pthread_create(&r1, NULL, reader, (void*)1);
+    pthread_create(&r2, NULL, reader, (void*)2);
+
+    // Wait for threads to finish (they run infinitely in this example)
+    pthread_join(w, NULL);
+    pthread_join(r1, NULL);
+    pthread_join(r2, NULL);
+
+    // Cleanup resources
+    sem_destroy(&rw_mutex);
+    sem_destroy(&mutex);
+
+    return 0;
+}
